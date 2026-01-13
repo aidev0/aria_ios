@@ -74,9 +74,9 @@ struct ContentView: View {
                 StatusCell(title: "session", value: glassesManager.sessionStatus.rawValue.lowercased(), isActive: glassesManager.sessionStatus == .active)
             }
             HStack(spacing: 2) {
-                StatusCell(title: "see", value: glassesManager.videoStatus.rawValue.lowercased(), isActive: glassesManager.videoStatus == .streaming)
-                StatusCell(title: "listen", value: glassesManager.audioStatus.rawValue.lowercased(), isActive: glassesManager.audioStatus == .streaming)
-                StatusCell(title: "talk", value: glassesManager.speakerStatus.rawValue.lowercased(), isActive: glassesManager.speakerStatus == .streaming)
+                StatusCell(title: "camera", value: glassesManager.videoStatus.rawValue.lowercased(), isActive: glassesManager.videoStatus == .streaming)
+                StatusCell(title: "microphone", value: glassesManager.audioStatus.rawValue.lowercased(), isActive: glassesManager.audioStatus == .streaming)
+                StatusCell(title: "speaker", value: glassesManager.speakerStatus.rawValue.lowercased(), isActive: glassesManager.speakerStatus == .streaming)
             }
         }
         .cornerRadius(12)
@@ -135,10 +135,10 @@ struct ContentView: View {
         } label: {
             let isConnected = webSocketManager.status == .connected
             VStack(spacing: 4) {
-                Image(systemName: "brain.head.profile")
+                Image(systemName: "cpu.fill")
                     .font(.title2)
                     .foregroundColor(isConnected ? .cyan : .white)
-                Text(webSocketManager.status == .disconnected ? "connect ai" : "disconnect")
+                Text(webSocketManager.status == .disconnected ? "connect to ai" : "disconnect")
                     .font(.caption)
                     .multilineTextAlignment(.center)
             }
@@ -226,7 +226,7 @@ struct ContentView: View {
             }
         } label: {
             VStack(spacing: 4) {
-                Image(systemName: "speaker.wave.2.fill")
+                Image(systemName: "waveform.and.person.filled")
                     .font(.title2)
                 Text(glassesManager.speakerStatus == .stopped ? "talk" : "stop")
                     .font(.caption)
