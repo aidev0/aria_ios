@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var webSocketManager = WebSocketManager()
     @StateObject private var glassesManager = GlassesManager()
+    @State private var selectedAgents: Set<AIAgent> = []
 
     var body: some View {
         NavigationView {
@@ -10,10 +11,10 @@ struct ContentView: View {
                 VStack(spacing: 20) {
                     // dashboard button at top
                     NavigationLink {
-                        DashboardView(glassesManager: glassesManager, webSocketManager: webSocketManager)
+                        DashboardView(glassesManager: glassesManager, webSocketManager: webSocketManager, selectedAgents: $selectedAgents)
                     } label: {
                         VStack(spacing: 8) {
-                            Image("Logo")
+                            Image(glassesManager.videoStatus == .streaming ? "aria_wf_bb" : "aria_wf_bb_nodot")
                                 .resizable()
                                 .scaledToFit()
                                 .frame(height: 50)
@@ -35,13 +36,13 @@ struct ContentView: View {
                     VStack(spacing: 2) {
                         HStack(spacing: 2) {
                             StatusCell(title: "glasses", value: glassesManager.connectionStatus.rawValue.lowercased(), isActive: glassesManager.connectionStatus == .connected)
-                            StatusCell(title: "kernel", value: webSocketManager.status.rawValue.lowercased(), isActive: webSocketManager.status == .connected)
+                            StatusCell(title: "ai", value: webSocketManager.status.rawValue.lowercased(), isActive: webSocketManager.status == .connected)
                             StatusCell(title: "session", value: glassesManager.sessionStatus.rawValue.lowercased(), isActive: glassesManager.sessionStatus == .active)
                         }
                         HStack(spacing: 2) {
-                            StatusCell(title: "video", value: glassesManager.videoStatus.rawValue.lowercased(), isActive: glassesManager.videoStatus == .streaming)
-                            StatusCell(title: "audio", value: glassesManager.audioStatus.rawValue.lowercased(), isActive: glassesManager.audioStatus == .streaming)
-                            StatusCell(title: "music", value: glassesManager.musicStatus.rawValue.lowercased(), isActive: glassesManager.musicStatus == .playing)
+                            StatusCell(title: "see", value: glassesManager.videoStatus.rawValue.lowercased(), isActive: glassesManager.videoStatus == .streaming)
+                            StatusCell(title: "listen", value: glassesManager.audioStatus.rawValue.lowercased(), isActive: glassesManager.audioStatus == .streaming)
+                            StatusCell(title: "talk", value: glassesManager.speakerStatus.rawValue.lowercased(), isActive: glassesManager.speakerStatus == .streaming)
                         }
                     }
                     .cornerRadius(12)
@@ -64,14 +65,20 @@ struct ContentView: View {
                                 VStack(spacing: 4) {
                                     Image(systemName: "eyeglasses")
                                         .font(.title2)
-                                    Text(glassesManager.connectionStatus == .disconnected ? "connect to glasses" : "disconnect")
+                                        .foregroundColor(glassesManager.connectionStatus == .connected ? .green : .white)
+                                    Text(glassesManager.connectionStatus == .disconnected ? "connect glasses" : "disconnect")
                                         .font(.caption)
                                         .multilineTextAlignment(.center)
                                 }
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 70)
-                                .background(Color(white: 0.15))
+                                .background(glassesManager.connectionStatus == .connected ? Color.green.opacity(0.2) : Color(white: 0.15))
                                 .cornerRadius(12)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(glassesManager.connectionStatus == .connected ? Color.green : Color.clear, lineWidth: 2)
+                                )
+                                .shadow(color: glassesManager.connectionStatus == .connected ? Color.green.opacity(0.5) : Color.clear, radius: 8)
                             }
 
                             Button {
@@ -82,16 +89,22 @@ struct ContentView: View {
                                 }
                             } label: {
                                 VStack(spacing: 4) {
-                                    Image(systemName: "network")
+                                    Image(systemName: "brain.head.profile")
                                         .font(.title2)
-                                    Text(webSocketManager.status == .disconnected ? "connect to kernel" : "disconnect")
+                                        .foregroundColor(webSocketManager.status == .connected ? .cyan : .white)
+                                    Text(webSocketManager.status == .disconnected ? "connect ai" : "disconnect")
                                         .font(.caption)
                                         .multilineTextAlignment(.center)
                                 }
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 70)
-                                .background(Color(white: 0.15))
+                                .background(webSocketManager.status == .connected ? Color.cyan.opacity(0.2) : Color(white: 0.15))
                                 .cornerRadius(12)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(webSocketManager.status == .connected ? Color.cyan : Color.clear, lineWidth: 2)
+                                )
+                                .shadow(color: webSocketManager.status == .connected ? Color.cyan.opacity(0.5) : Color.clear, radius: 8)
                             }
                         }
                     }
@@ -102,29 +115,6 @@ struct ContentView: View {
                             .font(.caption)
                             .foregroundColor(.gray)
                             .frame(maxWidth: .infinity, alignment: .leading)
-
-                        // session button
-                        Button {
-                            if glassesManager.sessionStatus == .idle {
-                                glassesManager.startSession()
-                                webSocketManager.sendCommand(action: "session_start")
-                            } else {
-                                glassesManager.endSession()
-                                webSocketManager.sendCommand(action: "session_end")
-                            }
-                        } label: {
-                            HStack {
-                                Image(systemName: glassesManager.sessionStatus == .idle ? "play.fill" : "stop.fill")
-                                Text(glassesManager.sessionStatus == .idle ? "start session" : "end session")
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color(white: 0.15))
-                            .foregroundColor(.white)
-                            .cornerRadius(12)
-                        }
-                        .disabled(glassesManager.connectionStatus != .connected || webSocketManager.status != .connected)
-                        .opacity(glassesManager.connectionStatus != .connected || webSocketManager.status != .connected ? 0.5 : 1)
 
                         // stream buttons
                         HStack(spacing: 12) {
@@ -138,9 +128,9 @@ struct ContentView: View {
                                 }
                             } label: {
                                 VStack(spacing: 4) {
-                                    Image(systemName: glassesManager.videoStatus == .stopped ? "video.fill" : "video.slash.fill")
+                                    Image(systemName: glassesManager.videoStatus == .stopped ? "video.fill" : "video.fill")
                                         .font(.title2)
-                                    Text(glassesManager.videoStatus == .stopped ? "video" : "stop")
+                                    Text(glassesManager.videoStatus == .stopped ? "see" : "stop")
                                         .font(.caption)
                                 }
                                 .frame(maxWidth: .infinity)
@@ -148,22 +138,20 @@ struct ContentView: View {
                                 .background(glassesManager.videoStatus == .streaming ? Color.purple : Color(white: 0.15))
                                 .cornerRadius(12)
                             }
-                            .disabled(glassesManager.sessionStatus != .active)
-                            .opacity(glassesManager.sessionStatus != .active ? 0.5 : 1)
 
                             Button {
                                 if glassesManager.audioStatus == .stopped {
                                     glassesManager.startAudio()
-                                    webSocketManager.sendCommand(action: "audio_start")
+                                    webSocketManager.sendCommand(action: "mic_start")
                                 } else {
                                     glassesManager.stopAudio()
-                                    webSocketManager.sendCommand(action: "audio_stop")
+                                    webSocketManager.sendCommand(action: "mic_stop")
                                 }
                             } label: {
                                 VStack(spacing: 4) {
-                                    Image(systemName: glassesManager.audioStatus == .stopped ? "waveform" : "waveform.slash")
+                                    Image(systemName: glassesManager.audioStatus == .stopped ? "mic.fill" : "mic.fill")
                                         .font(.title2)
-                                    Text(glassesManager.audioStatus == .stopped ? "audio" : "stop")
+                                    Text(glassesManager.audioStatus == .stopped ? "listen" : "stop")
                                         .font(.caption)
                                 }
                                 .frame(maxWidth: .infinity)
@@ -171,31 +159,67 @@ struct ContentView: View {
                                 .background(glassesManager.audioStatus == .streaming ? Color.orange : Color(white: 0.15))
                                 .cornerRadius(12)
                             }
-                            .disabled(glassesManager.sessionStatus != .active)
-                            .opacity(glassesManager.sessionStatus != .active ? 0.5 : 1)
 
                             Button {
-                                if glassesManager.musicStatus == .stopped {
-                                    glassesManager.startMusic()
-                                    webSocketManager.sendCommand(action: "music_start")
+                                if glassesManager.speakerStatus == .stopped {
+                                    glassesManager.startSpeaker()
+                                    webSocketManager.sendCommand(action: "speaker_start")
                                 } else {
-                                    glassesManager.stopMusic()
-                                    webSocketManager.sendCommand(action: "music_stop")
+                                    glassesManager.stopSpeaker()
+                                    webSocketManager.sendCommand(action: "speaker_stop")
                                 }
                             } label: {
                                 VStack(spacing: 4) {
-                                    Image(systemName: glassesManager.musicStatus == .stopped ? "music.note" : "music.note.slash")
+                                    Image(systemName: glassesManager.speakerStatus == .stopped ? "speaker.wave.2.fill" : "speaker.wave.2.fill")
                                         .font(.title2)
-                                    Text(glassesManager.musicStatus == .stopped ? "music" : "stop")
+                                    Text(glassesManager.speakerStatus == .stopped ? "talk" : "stop")
                                         .font(.caption)
                                 }
                                 .frame(maxWidth: .infinity)
                                 .padding()
-                                .background(glassesManager.musicStatus == .playing ? Color.pink : Color(white: 0.15))
+                                .background(glassesManager.speakerStatus == .streaming ? Color.pink : Color(white: 0.15))
                                 .cornerRadius(12)
                             }
-                            .disabled(glassesManager.sessionStatus != .active)
-                            .opacity(glassesManager.sessionStatus != .active ? 0.5 : 1)
+                        }
+                    }
+
+                    // ai agents
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("ai agents")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
+                            ForEach(AIAgent.allCases, id: \.self) { agent in
+                                Button {
+                                    if selectedAgents.contains(agent) {
+                                        selectedAgents.remove(agent)
+                                        webSocketManager.sendCommand(action: "agent_deselect_\(agent.rawValue)")
+                                    } else {
+                                        selectedAgents.insert(agent)
+                                        webSocketManager.sendCommand(action: "agent_select_\(agent.rawValue)")
+                                    }
+                                } label: {
+                                    VStack(spacing: 4) {
+                                        Image(systemName: agent.icon)
+                                            .font(.system(size: 18))
+                                        Text(agent.rawValue)
+                                            .font(.system(size: 9))
+                                            .lineLimit(1)
+                                            .minimumScaleFactor(0.7)
+                                    }
+                                    .foregroundColor(selectedAgents.contains(agent) ? .white : .gray)
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 50)
+                                    .background(selectedAgents.contains(agent) ? agent.color.opacity(0.3) : Color(white: 0.15))
+                                    .cornerRadius(10)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .stroke(selectedAgents.contains(agent) ? agent.color : Color.clear, lineWidth: 2)
+                                    )
+                                }
+                            }
                         }
                     }
 

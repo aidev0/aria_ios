@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject var glassesManager: GlassesManager
     @ObservedObject var webSocketManager: WebSocketManager
+    @Binding var selectedAgents: Set<AIAgent>
 
     @AppStorage("serverURL") private var serverURL = "ws://localhost:8000/glasses"
     @AppStorage("autoConnect") private var autoConnect = false
@@ -11,6 +12,45 @@ struct SettingsView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
+                // ai agents
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("ai agents")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
+                        ForEach(AIAgent.allCases, id: \.self) { agent in
+                            Button {
+                                if selectedAgents.contains(agent) {
+                                    selectedAgents.remove(agent)
+                                    webSocketManager.sendCommand(action: "agent_deselect_\(agent.rawValue)")
+                                } else {
+                                    selectedAgents.insert(agent)
+                                    webSocketManager.sendCommand(action: "agent_select_\(agent.rawValue)")
+                                }
+                            } label: {
+                                VStack(spacing: 4) {
+                                    Image(systemName: agent.icon)
+                                        .font(.system(size: 18))
+                                    Text(agent.rawValue)
+                                        .font(.system(size: 9))
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.7)
+                                }
+                                .foregroundColor(selectedAgents.contains(agent) ? .white : .gray)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 50)
+                                .background(selectedAgents.contains(agent) ? agent.color.opacity(0.3) : Color(white: 0.15))
+                                .cornerRadius(10)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .stroke(selectedAgents.contains(agent) ? agent.color : Color.clear, lineWidth: 2)
+                                )
+                            }
+                        }
+                    }
+                }
+
                 // status
                 VStack(spacing: 2) {
                     HStack(spacing: 2) {
@@ -287,6 +327,6 @@ struct SettingsStatusCell: View {
 
 #Preview {
     NavigationView {
-        SettingsView(glassesManager: GlassesManager(), webSocketManager: WebSocketManager())
+        SettingsView(glassesManager: GlassesManager(), webSocketManager: WebSocketManager(), selectedAgents: .constant([]))
     }
 }

@@ -23,9 +23,9 @@ enum AudioStatus: String {
     case streaming = "Streaming"
 }
 
-enum MusicStatus: String {
+enum SpeakerStatus: String {
     case stopped = "Stopped"
-    case playing = "Playing"
+    case streaming = "Streaming"
 }
 
 @MainActor
@@ -34,7 +34,7 @@ class GlassesManager: ObservableObject {
     @Published var sessionStatus: SessionStatus = .idle
     @Published var videoStatus: VideoStatus = .stopped
     @Published var audioStatus: AudioStatus = .stopped
-    @Published var musicStatus: MusicStatus = .stopped
+    @Published var speakerStatus: SpeakerStatus = .stopped
     @Published var musicVolume: Float = 1.0
     @Published var isAISpeaking: Bool = false
 
@@ -81,13 +81,13 @@ class GlassesManager: ObservableObject {
     func endSession() {
         stopVideo()
         stopAudio()
-        stopMusic()
+        stopSpeaker()
         // TODO: End session with glasses
         sessionStatus = .idle
     }
 
     func startVideo() {
-        guard sessionStatus == .active, videoStatus == .stopped else { return }
+        guard videoStatus == .stopped else { return }
         // TODO: Start video stream from glasses
         // wearablesManager?.startVideoStream { [weak self] frame in
         //     if let jpegData = frame.jpegData(compressionQuality: 0.7) {
@@ -104,7 +104,7 @@ class GlassesManager: ObservableObject {
     }
 
     func startAudio() {
-        guard sessionStatus == .active, audioStatus == .stopped else { return }
+        guard audioStatus == .stopped else { return }
         // TODO: Start audio stream from glasses
         // wearablesManager?.startAudioStream { [weak self] audioData in
         //     self?.audioCallback?(audioData.base64EncodedString())
@@ -118,13 +118,13 @@ class GlassesManager: ObservableObject {
         audioStatus = .stopped
     }
 
-    func startMusic() {
-        guard sessionStatus == .active, musicStatus == .stopped else { return }
-        musicStatus = .playing
+    func startSpeaker() {
+        guard speakerStatus == .stopped else { return }
+        speakerStatus = .streaming
     }
 
-    func stopMusic() {
-        musicStatus = .stopped
+    func stopSpeaker() {
+        speakerStatus = .stopped
     }
 
     // MARK: - AI Speaking / Music Ducking
@@ -156,7 +156,7 @@ class GlassesManager: ObservableObject {
         sessionStatus = .idle
         videoStatus = .stopped
         audioStatus = .stopped
-        musicStatus = .stopped
+        speakerStatus = .stopped
     }
 
     func onFrameReceived(_ jpegData: Data) {

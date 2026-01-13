@@ -3,12 +3,22 @@ import SwiftUI
 enum AIAgent: String, CaseIterable {
     case developer = "developer"
     case research = "research"
-    case computerUse = "cui"
+    case computerUse = "computer use"
     case translator = "translator"
-    case todo = "todo"
+    case todo = "project manager"
     case calendar = "calendar"
     case luma = "luma"
     case persona = "persona"
+    // row 2
+    case linkedin = "linkedin"
+    case whatsapp = "whatsapp"
+    case gmail = "gmail"
+    case slack = "slack"
+    // row 3
+    case dance = "dance"
+    case posture = "posture"
+    case language = "language"
+    case travel = "travel"
 
     var icon: String {
         switch self {
@@ -20,6 +30,16 @@ enum AIAgent: String, CaseIterable {
         case .calendar: return "calendar"
         case .luma: return "sparkle"
         case .persona: return "person.circle"
+        // row 2
+        case .linkedin: return "link"
+        case .whatsapp: return "message.fill"
+        case .gmail: return "envelope.fill"
+        case .slack: return "number"
+        // row 3
+        case .dance: return "figure.dance"
+        case .posture: return "figure.stand"
+        case .language: return "textformat"
+        case .travel: return "airplane"
         }
     }
 
@@ -33,6 +53,16 @@ enum AIAgent: String, CaseIterable {
         case .calendar: return .red
         case .luma: return .cyan
         case .persona: return .pink
+        // row 2
+        case .linkedin: return .blue
+        case .whatsapp: return .green
+        case .gmail: return .red
+        case .slack: return .purple
+        // row 3
+        case .dance: return .pink
+        case .posture: return .mint
+        case .language: return .orange
+        case .travel: return .indigo
         }
     }
 }
@@ -49,13 +79,14 @@ struct DashboardView: View {
     @ObservedObject var glassesManager: GlassesManager
     @ObservedObject var webSocketManager: WebSocketManager
     @Environment(\.presentationMode) var presentationMode
+    @Binding var selectedAgents: Set<AIAgent>
 
-    @State private var selectedAgents: Set<AIAgent> = []
-    @State private var viewingAgent: AIAgent? = nil
     @State private var transcript: [TranscriptEntry] = []
     @State private var userInput: String = ""
     @State private var currentFrame: String? = nil
     @State private var desktopFrame: String? = nil
+    @State private var aiResponses: [String] = []
+    @State private var currentResponseIndex: Int = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -72,11 +103,11 @@ struct DashboardView: View {
                             .frame(maxWidth: .infinity)
                     }
 
-                    // ai agents
-                    agentSelector
+                    // ai response
+                    aiResponseSection
 
-                    // agent preview (only show when viewing an agent)
-                    if viewingAgent != nil {
+                    // agent preview (show when agents are selected)
+                    if !selectedAgents.isEmpty {
                         agentPreviewSection
                     }
                 }
@@ -119,6 +150,12 @@ struct DashboardView: View {
                let isAI = notification.userInfo?["isAI"] as? Bool {
                 let entry = TranscriptEntry(timestamp: Date(), speaker: speaker, text: text, isAI: isAI)
                 transcript.append(entry)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .aiResponseReceived)) { notification in
+            if let response = notification.userInfo?["response"] as? String {
+                aiResponses.append(response)
+                currentResponseIndex = aiResponses.count - 1
             }
         }
     }
@@ -170,12 +207,57 @@ struct DashboardView: View {
         }
     }
 
+    // MARK: - ai response section
+
+    private var aiResponseSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("ai response")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                Spacer()
+                if aiResponses.count > 1 {
+                    Text("\(currentResponseIndex + 1)/\(aiResponses.count)")
+                        .font(.caption2)
+                        .foregroundColor(.gray)
+                }
+            }
+
+            ScrollView {
+                Text(aiResponses.isEmpty ? "waiting for ai response..." : aiResponses[currentResponseIndex])
+                    .font(.callout)
+                    .foregroundColor(aiResponses.isEmpty ? .gray : .white)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+            }
+            .frame(height: 100)
+            .background(Color(white: 0.1))
+            .cornerRadius(12)
+            .gesture(
+                DragGesture(minimumDistance: 30)
+                    .onEnded { value in
+                        if value.translation.width < 0 {
+                            // swipe left - next message
+                            if currentResponseIndex < aiResponses.count - 1 {
+                                withAnimation { currentResponseIndex += 1 }
+                            }
+                        } else if value.translation.width > 0 {
+                            // swipe right - previous message
+                            if currentResponseIndex > 0 {
+                                withAnimation { currentResponseIndex -= 1 }
+                            }
+                        }
+                    }
+            )
+        }
+    }
+
     // MARK: - agent preview section
 
     private var agentPreviewSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("active agents")
+                Text("agent: \(selectedAgents.first?.rawValue ?? "none")")
                     .font(.caption)
                     .foregroundColor(.gray)
                 Spacer()
@@ -188,7 +270,7 @@ struct DashboardView: View {
                 }
             }
 
-            if let agent = viewingAgent {
+            if let agent = selectedAgents.first {
                 ZStack {
                     RoundedRectangle(cornerRadius: 12)
                         .fill(Color(white: 0.1))
@@ -219,6 +301,37 @@ struct DashboardView: View {
             lumaPreview
         case .persona:
             personaPreview
+        case .linkedin:
+            genericAgentPreview(agent: agent, waitingText: "waiting for linkedin...")
+        case .whatsapp:
+            genericAgentPreview(agent: agent, waitingText: "waiting for messages...")
+        case .gmail:
+            genericAgentPreview(agent: agent, waitingText: "waiting for emails...")
+        case .slack:
+            genericAgentPreview(agent: agent, waitingText: "waiting for slack...")
+        case .dance:
+            genericAgentPreview(agent: agent, waitingText: "waiting for dance moves...")
+        case .posture:
+            genericAgentPreview(agent: agent, waitingText: "analyzing posture...")
+        case .language:
+            genericAgentPreview(agent: agent, waitingText: "waiting for lesson...")
+        case .travel:
+            genericAgentPreview(agent: agent, waitingText: "planning travel...")
+        }
+    }
+
+    private func genericAgentPreview(agent: AIAgent, waitingText: String) -> some View {
+        VStack(spacing: 8) {
+            Image(systemName: agent.icon)
+                .font(.system(size: 36))
+                .foregroundColor(agent.color.opacity(0.7))
+            Text(agent.rawValue)
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(agent.color)
+            Text(waitingText)
+                .font(.caption2)
+                .foregroundColor(.gray)
         }
     }
 
@@ -266,7 +379,7 @@ struct DashboardView: View {
                     Image(systemName: "desktopcomputer")
                         .font(.system(size: 36))
                         .foregroundColor(.orange.opacity(0.7))
-                    Text("cui")
+                    Text("computer use")
                         .font(.caption)
                         .fontWeight(.medium)
                         .foregroundColor(.orange)
@@ -298,7 +411,7 @@ struct DashboardView: View {
             Image(systemName: "checklist")
                 .font(.system(size: 36))
                 .foregroundColor(.yellow.opacity(0.7))
-            Text("todo")
+            Text("project manager")
                 .font(.caption)
                 .fontWeight(.medium)
                 .foregroundColor(.yellow)
@@ -350,47 +463,6 @@ struct DashboardView: View {
             Text("waiting for persona...")
                 .font(.caption2)
                 .foregroundColor(.gray)
-        }
-    }
-
-    // MARK: - agent selector
-
-    private var agentSelector: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("ai agents")
-                .font(.caption)
-                .foregroundColor(.gray)
-
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
-                ForEach(AIAgent.allCases, id: \.self) { agent in
-                    AgentButtonWithLongPress(
-                        agent: agent,
-                        isSelected: selectedAgents.contains(agent),
-                        onTap: {
-                            // tap toggles selection
-                            if selectedAgents.contains(agent) {
-                                selectedAgents.remove(agent)
-                                if viewingAgent == agent {
-                                    viewingAgent = selectedAgents.first
-                                }
-                                webSocketManager.sendCommand(action: "agent_deselect_\(agent.rawValue.replacingOccurrences(of: " ", with: "_"))")
-                            } else {
-                                selectedAgents.insert(agent)
-                                viewingAgent = agent
-                                webSocketManager.sendCommand(action: "agent_select_\(agent.rawValue.replacingOccurrences(of: " ", with: "_"))")
-                            }
-                        },
-                        onLongPress: {
-                            // long press switches preview to this agent (and selects if not selected)
-                            if !selectedAgents.contains(agent) {
-                                selectedAgents.insert(agent)
-                                webSocketManager.sendCommand(action: "agent_select_\(agent.rawValue.replacingOccurrences(of: " ", with: "_"))")
-                            }
-                            viewingAgent = agent
-                        }
-                    )
-                }
-            }
         }
     }
 
@@ -474,67 +546,6 @@ struct DashboardView: View {
 }
 
 // MARK: - supporting views
-
-struct AgentButton: View {
-    let agent: AIAgent
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 4) {
-                Image(systemName: agent.icon)
-                    .font(.system(size: 18))
-                Text(agent.rawValue)
-                    .font(.system(size: 9))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-            }
-            .foregroundColor(isSelected ? .white : .gray)
-            .frame(maxWidth: .infinity)
-            .frame(height: 50)
-            .background(isSelected ? agent.color.opacity(0.3) : Color(white: 0.15))
-            .cornerRadius(10)
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(isSelected ? agent.color : Color.clear, lineWidth: 2)
-            )
-        }
-    }
-}
-
-struct AgentButtonWithLongPress: View {
-    let agent: AIAgent
-    let isSelected: Bool
-    let onTap: () -> Void
-    let onLongPress: () -> Void
-
-    var body: some View {
-        VStack(spacing: 4) {
-            Image(systemName: agent.icon)
-                .font(.system(size: 18))
-            Text(agent.rawValue)
-                .font(.system(size: 9))
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-        }
-        .foregroundColor(isSelected ? .white : .gray)
-        .frame(maxWidth: .infinity)
-        .frame(height: 50)
-        .background(isSelected ? agent.color.opacity(0.3) : Color(white: 0.15))
-        .cornerRadius(10)
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(isSelected ? agent.color : Color.clear, lineWidth: 2)
-        )
-        .onTapGesture {
-            onTap()
-        }
-        .onLongPressGesture(minimumDuration: 1.0) {
-            onLongPress()
-        }
-    }
-}
 
 struct TranscriptBubble: View {
     let entry: TranscriptEntry
@@ -621,4 +632,5 @@ struct QuickActionButton: View {
 
 extension Notification.Name {
     static let frameReceived = Notification.Name("frameReceived")
+    static let aiResponseReceived = Notification.Name("aiResponseReceived")
 }
