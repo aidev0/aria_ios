@@ -4,13 +4,13 @@ struct ContentView: View {
     @StateObject private var webSocketManager = WebSocketManager()
     @StateObject private var glassesManager = GlassesManager()
     @State private var selectedAgents: Set<AIAgent> = []
+    @State private var agentConfigs: [AIAgent: AgentConfig] = [:]
 
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 20) {
                     dashboardButton
-                    statusTable
                     connectionsSection
                     controlsSection
                     aiAgentsSection
@@ -18,8 +18,11 @@ struct ContentView: View {
                 }
                 .padding()
             }
+            .scrollContentBackground(.hidden)
             .background(Color.black)
             .foregroundColor(.white)
+            .toolbarBackground(Color.black, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .navigationBarTitleDisplayMode(.inline)
             .onAppear {
                 glassesManager.setFrameCallback { base64Data in
@@ -40,46 +43,58 @@ struct ContentView: View {
             }
         }
         .navigationViewStyle(.stack)
+        .preferredColorScheme(.dark)
     }
 
     private var dashboardButton: some View {
         NavigationLink {
-            DashboardView(glassesManager: glassesManager, webSocketManager: webSocketManager, selectedAgents: $selectedAgents)
+            DashboardView(glassesManager: glassesManager, webSocketManager: webSocketManager, selectedAgents: $selectedAgents, agentConfigs: $agentConfigs)
         } label: {
-            VStack(spacing: 8) {
-                Image(glassesManager.videoStatus == .streaming ? "aria_wf_bb" : "aria_wf_bb_nodot")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(height: 50)
-                Text("click to enjoy aria glasses")
-                    .font(.caption)
-                    .foregroundColor(.gray)
+            VStack(spacing: 12) {
+                ZStack(alignment: .topTrailing) {
+                    HStack(spacing: 20) {
+                        Image("aria_wf_bb")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(height: 50)
+                        Image("aria_wf_bb")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(height: 50)
+                    }
+                    .shadow(color: glassesManager.videoStatus == .streaming ? .red.opacity(0.8) : .white.opacity(0.3), radius: 20)
+
+                    // Recording indicator
+                    if glassesManager.videoStatus == .streaming {
+                        Circle()
+                            .fill(Color.red)
+                            .frame(width: 10, height: 10)
+                            .shadow(color: .red, radius: 4)
+                            .offset(x: 5, y: -5)
+                    }
+                }
+                Text("tap to enter aria")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white.opacity(0.7))
+                    .tracking(2)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 20)
-            .background(Color(white: 0.12))
-            .cornerRadius(12)
+            .padding(.vertical, 30)
+            .background(Color.black)
+            .cornerRadius(16)
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color(white: 0.25), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(
+                        LinearGradient(
+                            colors: [.white.opacity(0.3), .white.opacity(0.1)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        lineWidth: 1
+                    )
             )
+            .shadow(color: .white.opacity(0.1), radius: 10)
         }
-    }
-
-    private var statusTable: some View {
-        VStack(spacing: 2) {
-            HStack(spacing: 2) {
-                StatusCell(title: "glasses", value: glassesManager.connectionStatus.rawValue.lowercased(), isActive: glassesManager.connectionStatus == .connected)
-                StatusCell(title: "ai", value: webSocketManager.status.rawValue.lowercased(), isActive: webSocketManager.status == .connected)
-                StatusCell(title: "session", value: glassesManager.sessionStatus.rawValue.lowercased(), isActive: glassesManager.sessionStatus == .active)
-            }
-            HStack(spacing: 2) {
-                StatusCell(title: "camera", value: glassesManager.videoStatus.rawValue.lowercased(), isActive: glassesManager.videoStatus == .streaming)
-                StatusCell(title: "microphone", value: glassesManager.audioStatus.rawValue.lowercased(), isActive: glassesManager.audioStatus == .streaming)
-                StatusCell(title: "speaker", value: glassesManager.speakerStatus.rawValue.lowercased(), isActive: glassesManager.speakerStatus == .streaming)
-            }
-        }
-        .cornerRadius(12)
     }
 
     private var connectionsSection: some View {
@@ -170,7 +185,8 @@ struct ContentView: View {
     }
 
     private var videoControlButton: some View {
-        Button {
+        let isActive = glassesManager.videoStatus == .streaming
+        return Button {
             if glassesManager.videoStatus == .stopped {
                 glassesManager.startVideo()
                 webSocketManager.sendCommand(action: "video_start")
@@ -179,21 +195,33 @@ struct ContentView: View {
                 webSocketManager.sendCommand(action: "video_stop")
             }
         } label: {
-            VStack(spacing: 4) {
-                Image(systemName: "video.fill")
-                    .font(.title2)
-                Text(glassesManager.videoStatus == .stopped ? "see" : "stop")
-                    .font(.caption)
+            ZStack(alignment: .topTrailing) {
+                VStack(spacing: 4) {
+                    Image(systemName: "video.fill")
+                        .font(.title2)
+                        .foregroundColor(isActive ? .white : .gray)
+                    Text(isActive ? "rec" : "see")
+                        .font(.caption)
+                        .foregroundColor(isActive ? .white : .gray)
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(isActive ? Color.red : Color(white: 0.15))
+                .cornerRadius(12)
+
+                if isActive {
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: 8, height: 8)
+                        .offset(x: -8, y: 8)
+                }
             }
-            .frame(maxWidth: .infinity)
-            .padding()
-            .background(glassesManager.videoStatus == .streaming ? Color.purple : Color(white: 0.15))
-            .cornerRadius(12)
         }
     }
 
     private var audioControlButton: some View {
-        Button {
+        let isActive = glassesManager.audioStatus == .streaming
+        return Button {
             if glassesManager.audioStatus == .stopped {
                 glassesManager.startAudio()
                 webSocketManager.sendCommand(action: "mic_start")
@@ -202,21 +230,33 @@ struct ContentView: View {
                 webSocketManager.sendCommand(action: "mic_stop")
             }
         } label: {
-            VStack(spacing: 4) {
-                Image(systemName: "mic.fill")
-                    .font(.title2)
-                Text(glassesManager.audioStatus == .stopped ? "listen" : "stop")
-                    .font(.caption)
+            ZStack(alignment: .topTrailing) {
+                VStack(spacing: 4) {
+                    Image(systemName: "mic.fill")
+                        .font(.title2)
+                        .foregroundColor(isActive ? .white : .gray)
+                    Text(isActive ? "on" : "listen")
+                        .font(.caption)
+                        .foregroundColor(isActive ? .white : .gray)
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(isActive ? Color.red : Color(white: 0.15))
+                .cornerRadius(12)
+
+                if isActive {
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: 8, height: 8)
+                        .offset(x: -8, y: 8)
+                }
             }
-            .frame(maxWidth: .infinity)
-            .padding()
-            .background(glassesManager.audioStatus == .streaming ? Color.orange : Color(white: 0.15))
-            .cornerRadius(12)
         }
     }
 
     private var speakerControlButton: some View {
-        Button {
+        let isActive = glassesManager.speakerStatus == .streaming
+        return Button {
             if glassesManager.speakerStatus == .stopped {
                 glassesManager.startSpeaker()
                 webSocketManager.sendCommand(action: "speaker_start")
@@ -225,16 +265,27 @@ struct ContentView: View {
                 webSocketManager.sendCommand(action: "speaker_stop")
             }
         } label: {
-            VStack(spacing: 4) {
-                Image(systemName: "waveform.and.person.filled")
-                    .font(.title2)
-                Text(glassesManager.speakerStatus == .stopped ? "talk" : "stop")
-                    .font(.caption)
+            ZStack(alignment: .topTrailing) {
+                VStack(spacing: 4) {
+                    Image(systemName: "speaker.wave.2.fill")
+                        .font(.title2)
+                        .foregroundColor(isActive ? .white : .gray)
+                    Text(isActive ? "on" : "talk")
+                        .font(.caption)
+                        .foregroundColor(isActive ? .white : .gray)
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(isActive ? Color.red : Color(white: 0.15))
+                .cornerRadius(12)
+
+                if isActive {
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: 8, height: 8)
+                        .offset(x: -8, y: 8)
+                }
             }
-            .frame(maxWidth: .infinity)
-            .padding()
-            .background(glassesManager.speakerStatus == .streaming ? Color.pink : Color(white: 0.15))
-            .cornerRadius(12)
         }
     }
 
@@ -250,7 +301,7 @@ struct ContentView: View {
     }
 
     private var aiAgentsGrid: some View {
-        let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 4)
+        let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 3)
         return LazyVGrid(columns: columns, spacing: 8) {
             ForEach(AIAgent.allCases, id: \.self) { agent in
                 agentButton(for: agent)
@@ -272,7 +323,7 @@ struct ContentView: View {
             VStack(spacing: 4) {
                 Image(systemName: agent.icon)
                     .font(.system(size: 18))
-                Text(agent.rawValue)
+                Text(agent.displayName)
                     .font(.system(size: 9))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -288,30 +339,9 @@ struct ContentView: View {
             )
         }
     }
+
 }
 
-// MARK: - Status Cell
-
-struct StatusCell: View {
-    let title: String
-    let value: String
-    let isActive: Bool
-
-    var body: some View {
-        VStack(spacing: 4) {
-            Text(title)
-                .font(.caption2)
-                .foregroundColor(.gray)
-            Text(value)
-                .font(.caption)
-                .fontWeight(.medium)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
-        .background(isActive ? Color.green.opacity(0.2) : Color(white: 0.1))
-        .foregroundColor(isActive ? .green : .white)
-    }
-}
 
 #Preview {
     ContentView()

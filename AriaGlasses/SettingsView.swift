@@ -4,22 +4,26 @@ struct SettingsView: View {
     @ObservedObject var glassesManager: GlassesManager
     @ObservedObject var webSocketManager: WebSocketManager
     @Binding var selectedAgents: Set<AIAgent>
+    @Binding var agentConfigs: [AIAgent: AgentConfig]
 
-    @AppStorage("serverURL") private var serverURL = "ws://localhost:8000/glasses"
+    @AppStorage("serverURL") private var serverURL = "ws://localhost:8888/glasses"
     @AppStorage("autoConnect") private var autoConnect = false
     @AppStorage("hapticFeedback") private var hapticFeedback = true
+
+    @State private var configuringAgent: AIAgent? = nil
 
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
-                // ai agents
+                // ai agents (6 dev pipeline agents)
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("ai agents")
+                    Text("development agents")
                         .font(.caption)
                         .foregroundColor(.gray)
 
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
                         ForEach(AIAgent.allCases, id: \.self) { agent in
+                            let config = agentConfigs[agent] ?? AgentConfig()
                             Button {
                                 if selectedAgents.contains(agent) {
                                     selectedAgents.remove(agent)
@@ -32,20 +36,74 @@ struct SettingsView: View {
                                 VStack(spacing: 4) {
                                     Image(systemName: agent.icon)
                                         .font(.system(size: 18))
-                                    Text(agent.rawValue)
+                                    Text(agent.displayName)
                                         .font(.system(size: 9))
                                         .lineLimit(1)
-                                        .minimumScaleFactor(0.7)
+                                    Text(config.model.displayName)
+                                        .font(.system(size: 7))
+                                        .foregroundColor(config.model.color)
                                 }
                                 .foregroundColor(selectedAgents.contains(agent) ? .white : .gray)
                                 .frame(maxWidth: .infinity)
-                                .frame(height: 50)
+                                .frame(height: 60)
                                 .background(selectedAgents.contains(agent) ? agent.color.opacity(0.3) : Color(white: 0.15))
                                 .cornerRadius(10)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 10)
                                         .stroke(selectedAgents.contains(agent) ? agent.color : Color.clear, lineWidth: 2)
                                 )
+                            }
+                            .contextMenu {
+                                Button {
+                                    configuringAgent = agent
+                                } label: {
+                                    Label("Configure Model & CLI", systemImage: "gearshape")
+                                }
+                            }
+                        }
+                    }
+
+                    Text("Long press an agent to configure its model & CLI")
+                        .font(.system(size: 9))
+                        .foregroundColor(.gray)
+                }
+
+                // agent configs summary
+                if !selectedAgents.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("agent configurations")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+
+                        ForEach(Array(selectedAgents).sorted(by: { $0.rawValue < $1.rawValue }), id: \.self) { agent in
+                            let config = agentConfigs[agent] ?? AgentConfig()
+                            Button {
+                                configuringAgent = agent
+                            } label: {
+                                HStack {
+                                    Image(systemName: agent.icon)
+                                        .foregroundColor(agent.color)
+                                        .frame(width: 24)
+                                    Text(agent.displayName)
+                                        .foregroundColor(.white)
+                                    Spacer()
+                                    VStack(alignment: .trailing, spacing: 2) {
+                                        Text(config.model.displayName)
+                                            .font(.caption2)
+                                            .foregroundColor(config.model.color)
+                                        if config.useCli {
+                                            Text(config.cli.displayName)
+                                                .font(.system(size: 9))
+                                                .foregroundColor(.gray)
+                                        }
+                                    }
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
+                                }
+                                .padding(12)
+                                .background(Color(white: 0.1))
+                                .cornerRadius(10)
                             }
                         }
                     }
@@ -146,7 +204,7 @@ struct SettingsView: View {
                         .padding()
                         .background(Color(white: 0.1))
 
-                        TextField("ws://localhost:8000/glasses", text: $serverURL)
+                        TextField("ws://localhost:8888/glasses", text: $serverURL)
                             .textFieldStyle(.plain)
                             .font(.caption)
                             .padding()
@@ -193,74 +251,11 @@ struct SettingsView: View {
                         .foregroundColor(.gray)
 
                     VStack(spacing: 0) {
-                        SettingsRow(icon: "info.circle", iconColor: .blue, title: "version", value: "1.0.0")
+                        SettingsRow(icon: "info.circle", iconColor: .blue, title: "version", value: "2.0.0")
                         Divider().background(Color(white: 0.2))
-                        SettingsRow(icon: "swift", iconColor: .orange, title: "build", value: "2026.01.10")
+                        SettingsRow(icon: "swift", iconColor: .orange, title: "build", value: "2026.03.23")
                         Divider().background(Color(white: 0.2))
                         SettingsRow(icon: "person.fill", iconColor: .green, title: "developer", value: "aria team")
-                    }
-                    .background(Color(white: 0.1))
-                    .cornerRadius(12)
-                }
-
-                // links
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("links")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-
-                    VStack(spacing: 0) {
-                        Button {
-                            // open docs
-                        } label: {
-                            HStack {
-                                Image(systemName: "book.fill")
-                                    .foregroundColor(.blue)
-                                    .frame(width: 24)
-                                Text("documentation")
-                                    .foregroundColor(.white)
-                                Spacer()
-                                Image(systemName: "arrow.up.right")
-                                    .foregroundColor(.gray)
-                            }
-                            .padding()
-                        }
-
-                        Divider().background(Color(white: 0.2))
-
-                        Button {
-                            // open github
-                        } label: {
-                            HStack {
-                                Image(systemName: "chevron.left.forwardslash.chevron.right")
-                                    .foregroundColor(.purple)
-                                    .frame(width: 24)
-                                Text("source code")
-                                    .foregroundColor(.white)
-                                Spacer()
-                                Image(systemName: "arrow.up.right")
-                                    .foregroundColor(.gray)
-                            }
-                            .padding()
-                        }
-
-                        Divider().background(Color(white: 0.2))
-
-                        Button {
-                            // open support
-                        } label: {
-                            HStack {
-                                Image(systemName: "questionmark.circle.fill")
-                                    .foregroundColor(.green)
-                                    .frame(width: 24)
-                                Text("support")
-                                    .foregroundColor(.white)
-                                Spacer()
-                                Image(systemName: "arrow.up.right")
-                                    .foregroundColor(.gray)
-                            }
-                            .padding()
-                        }
                     }
                     .background(Color(white: 0.1))
                     .cornerRadius(12)
@@ -274,12 +269,25 @@ struct SettingsView: View {
         .foregroundColor(.white)
         .navigationTitle("connections")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Text("connections")
-                    .font(.headline)
-                    .foregroundColor(.white)
-            }
+        .sheet(item: $configuringAgent) { agent in
+            AgentConfigSheet(
+                agent: agent,
+                config: Binding(
+                    get: { agentConfigs[agent] ?? AgentConfig() },
+                    set: { agentConfigs[agent] = $0 }
+                ),
+                onSave: { config in
+                    agentConfigs[agent] = config
+                    webSocketManager.send(message: [
+                        "type": "agent_config",
+                        "agent": agent.rawValue,
+                        "model": config.model.rawValue,
+                        "cli": config.cli.rawValue,
+                        "use_cli": config.useCli
+                    ])
+                    configuringAgent = nil
+                }
+            )
         }
     }
 }
@@ -327,6 +335,11 @@ struct SettingsStatusCell: View {
 
 #Preview {
     NavigationView {
-        SettingsView(glassesManager: GlassesManager(), webSocketManager: WebSocketManager(), selectedAgents: .constant([]))
+        SettingsView(
+            glassesManager: GlassesManager(),
+            webSocketManager: WebSocketManager(),
+            selectedAgents: .constant([]),
+            agentConfigs: .constant([:])
+        )
     }
 }

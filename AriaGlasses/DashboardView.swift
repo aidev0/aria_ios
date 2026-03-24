@@ -1,71 +1,107 @@
 import SwiftUI
 
-enum AIAgent: String, CaseIterable {
+// MARK: - Dev Pipeline Agents (refactored from 8 to 6)
+
+enum AIAgent: String, CaseIterable, Codable {
+    case planner = "planner"
     case developer = "developer"
-    case research = "research"
-    case computerUse = "computer use"
-    case translator = "translator"
-    case todo = "project manager"
-    case calendar = "calendar"
-    case luma = "luma"
-    case persona = "persona"
-    // row 2
-    case linkedin = "linkedin"
-    case whatsapp = "whatsapp"
-    case gmail = "gmail"
-    case slack = "slack"
-    // row 3
-    case dance = "dance"
-    case posture = "posture"
-    case language = "language"
-    case travel = "travel"
+    case tester = "tester"
+    case codeReviewer = "code_reviewer"
+    case deployer = "deployer"
+    case reporter = "reporter"
+
+    var displayName: String {
+        switch self {
+        case .planner: return "Planner"
+        case .developer: return "Developer"
+        case .tester: return "Tester"
+        case .codeReviewer: return "Reviewer"
+        case .deployer: return "Deployer"
+        case .reporter: return "Reporter"
+        }
+    }
 
     var icon: String {
         switch self {
+        case .planner: return "list.clipboard"
         case .developer: return "chevron.left.forwardslash.chevron.right"
-        case .research: return "magnifyingglass"
-        case .computerUse: return "desktopcomputer"
-        case .translator: return "globe"
-        case .todo: return "checklist"
-        case .calendar: return "calendar"
-        case .luma: return "sparkle"
-        case .persona: return "person.circle"
-        // row 2
-        case .linkedin: return "link"
-        case .whatsapp: return "message.fill"
-        case .gmail: return "envelope.fill"
-        case .slack: return "number"
-        // row 3
-        case .dance: return "figure.dance"
-        case .posture: return "figure.stand"
-        case .language: return "textformat"
-        case .travel: return "airplane"
+        case .tester: return "flask"
+        case .codeReviewer: return "magnifyingglass"
+        case .deployer: return "arrow.up.circle"
+        case .reporter: return "chart.bar"
         }
     }
 
     var color: Color {
         switch self {
-        case .developer: return .purple
-        case .research: return .blue
-        case .computerUse: return .orange
-        case .translator: return .green
-        case .todo: return .yellow
-        case .calendar: return .red
-        case .luma: return .cyan
-        case .persona: return .pink
-        // row 2
-        case .linkedin: return .blue
-        case .whatsapp: return .green
-        case .gmail: return .red
-        case .slack: return .purple
-        // row 3
-        case .dance: return .pink
-        case .posture: return .mint
-        case .language: return .orange
-        case .travel: return .indigo
+        case .planner: return .purple
+        case .developer: return .blue
+        case .tester: return .green
+        case .codeReviewer: return .orange
+        case .deployer: return .pink
+        case .reporter: return .cyan
+        }
+    }
+
+    var waitingText: String {
+        switch self {
+        case .planner: return "waiting for plan..."
+        case .developer: return "waiting for code..."
+        case .tester: return "waiting for tests..."
+        case .codeReviewer: return "waiting for review..."
+        case .deployer: return "waiting for deploy..."
+        case .reporter: return "waiting for report..."
         }
     }
 }
+
+// MARK: - Model & CLI options
+
+enum LLMModel: String, CaseIterable, Codable {
+    case claude = "claude"
+    case gemini = "gemini"
+    case openai = "openai"
+
+    var displayName: String {
+        switch self {
+        case .claude: return "Claude Opus 4.6"
+        case .gemini: return "Gemini 3.1 Pro"
+        case .openai: return "GPT-5.4"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .claude: return .orange
+        case .gemini: return .blue
+        case .openai: return .green
+        }
+    }
+}
+
+enum CLITool: String, CaseIterable, Codable {
+    case none = "none"
+    case claude = "claude"
+    case gemini = "gemini"
+    case codex = "codex"
+
+    var displayName: String {
+        switch self {
+        case .none: return "API Only"
+        case .claude: return "Claude Code"
+        case .gemini: return "Gemini CLI"
+        case .codex: return "Codex CLI"
+        }
+    }
+}
+
+struct AgentConfig: Codable {
+    var model: LLMModel = .claude
+    var cli: CLITool = .none
+    var useCli: Bool = false
+}
+
+// MARK: - Data models
 
 struct TranscriptEntry: Identifiable {
     let id = UUID()
@@ -75,11 +111,14 @@ struct TranscriptEntry: Identifiable {
     let isAI: Bool
 }
 
+// MARK: - Dashboard View
+
 struct DashboardView: View {
     @ObservedObject var glassesManager: GlassesManager
     @ObservedObject var webSocketManager: WebSocketManager
     @Environment(\.presentationMode) var presentationMode
     @Binding var selectedAgents: Set<AIAgent>
+    @Binding var agentConfigs: [AIAgent: AgentConfig]
 
     @State private var transcript: [TranscriptEntry] = []
     @State private var userInput: String = ""
@@ -87,26 +126,21 @@ struct DashboardView: View {
     @State private var desktopFrame: String? = nil
     @State private var aiResponses: [String] = []
     @State private var currentResponseIndex: Int = 0
+    @State private var configuringAgent: AIAgent? = nil
 
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(spacing: 16) {
-                    // video and transcript side by side
                     HStack(alignment: .top, spacing: 12) {
-                        // video feed
                         videoSection
                             .frame(maxWidth: .infinity)
-
-                        // transcript
                         transcriptSection
                             .frame(maxWidth: .infinity)
                     }
 
-                    // ai response
                     aiResponseSection
 
-                    // agent preview (show when agents are selected)
                     if !selectedAgents.isEmpty {
                         agentPreviewSection
                     }
@@ -114,15 +148,18 @@ struct DashboardView: View {
                 .padding()
             }
 
-            // input fixed at bottom
             inputSection
                 .padding()
                 .background(Color.black)
         }
+        .scrollContentBackground(.hidden)
         .background(Color.black)
+        .toolbarBackground(Color.black, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .navigationTitle("aria")
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
+        .preferredColorScheme(.dark)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button {
@@ -158,9 +195,30 @@ struct DashboardView: View {
                 currentResponseIndex = aiResponses.count - 1
             }
         }
+        .sheet(item: $configuringAgent) { agent in
+            AgentConfigSheet(
+                agent: agent,
+                config: Binding(
+                    get: { agentConfigs[agent] ?? AgentConfig() },
+                    set: { agentConfigs[agent] = $0 }
+                ),
+                onSave: { config in
+                    agentConfigs[agent] = config
+                    // Send config to backend
+                    webSocketManager.send(message: [
+                        "type": "agent_config",
+                        "agent": agent.rawValue,
+                        "model": config.model.rawValue,
+                        "cli": config.cli.rawValue,
+                        "use_cli": config.useCli
+                    ])
+                    configuringAgent = nil
+                }
+            )
+        }
     }
 
-    // MARK: - video section
+    // MARK: - Video section
 
     private var videoSection: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -207,7 +265,7 @@ struct DashboardView: View {
         }
     }
 
-    // MARK: - ai response section
+    // MARK: - AI Response section
 
     private var aiResponseSection: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -236,28 +294,22 @@ struct DashboardView: View {
             .gesture(
                 DragGesture(minimumDistance: 30)
                     .onEnded { value in
-                        if value.translation.width < 0 {
-                            // swipe left - next message
-                            if currentResponseIndex < aiResponses.count - 1 {
-                                withAnimation { currentResponseIndex += 1 }
-                            }
-                        } else if value.translation.width > 0 {
-                            // swipe right - previous message
-                            if currentResponseIndex > 0 {
-                                withAnimation { currentResponseIndex -= 1 }
-                            }
+                        if value.translation.width < 0, currentResponseIndex < aiResponses.count - 1 {
+                            withAnimation { currentResponseIndex += 1 }
+                        } else if value.translation.width > 0, currentResponseIndex > 0 {
+                            withAnimation { currentResponseIndex -= 1 }
                         }
                     }
             )
         }
     }
 
-    // MARK: - agent preview section
+    // MARK: - Agent preview with config
 
     private var agentPreviewSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("agent: \(selectedAgents.first?.rawValue ?? "none")")
+                Text("agents")
                     .font(.caption)
                     .foregroundColor(.gray)
                 Spacer()
@@ -270,203 +322,45 @@ struct DashboardView: View {
                 }
             }
 
-            if let agent = selectedAgents.first {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color(white: 0.1))
-                        .aspectRatio(16/9, contentMode: .fit)
-
-                    agentPreviewContent(for: agent)
+            // Agent cards with config buttons
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                ForEach(Array(selectedAgents), id: \.self) { agent in
+                    let config = agentConfigs[agent] ?? AgentConfig()
+                    Button {
+                        configuringAgent = agent
+                    } label: {
+                        VStack(spacing: 6) {
+                            Image(systemName: agent.icon)
+                                .font(.system(size: 20))
+                                .foregroundColor(agent.color)
+                            Text(agent.displayName)
+                                .font(.caption2)
+                                .fontWeight(.medium)
+                                .foregroundColor(.white)
+                            Text(config.model.displayName)
+                                .font(.system(size: 8))
+                                .foregroundColor(config.model.color)
+                            if config.useCli {
+                                Text(config.cli.displayName)
+                                    .font(.system(size: 7))
+                                    .foregroundColor(.gray)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(agent.color.opacity(0.1))
+                        .cornerRadius(10)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(agent.color.opacity(0.3), lineWidth: 1)
+                        )
+                    }
                 }
             }
         }
     }
 
-    @ViewBuilder
-    private func agentPreviewContent(for agent: AIAgent) -> some View {
-        switch agent {
-        case .developer:
-            developerPreview
-        case .research:
-            researchPreview
-        case .computerUse:
-            computerUsePreview
-        case .translator:
-            translatorPreview
-        case .todo:
-            todoPreview
-        case .calendar:
-            calendarPreview
-        case .luma:
-            lumaPreview
-        case .persona:
-            personaPreview
-        case .linkedin:
-            genericAgentPreview(agent: agent, waitingText: "waiting for linkedin...")
-        case .whatsapp:
-            genericAgentPreview(agent: agent, waitingText: "waiting for messages...")
-        case .gmail:
-            genericAgentPreview(agent: agent, waitingText: "waiting for emails...")
-        case .slack:
-            genericAgentPreview(agent: agent, waitingText: "waiting for slack...")
-        case .dance:
-            genericAgentPreview(agent: agent, waitingText: "waiting for dance moves...")
-        case .posture:
-            genericAgentPreview(agent: agent, waitingText: "analyzing posture...")
-        case .language:
-            genericAgentPreview(agent: agent, waitingText: "waiting for lesson...")
-        case .travel:
-            genericAgentPreview(agent: agent, waitingText: "planning travel...")
-        }
-    }
-
-    private func genericAgentPreview(agent: AIAgent, waitingText: String) -> some View {
-        VStack(spacing: 8) {
-            Image(systemName: agent.icon)
-                .font(.system(size: 36))
-                .foregroundColor(agent.color.opacity(0.7))
-            Text(agent.rawValue)
-                .font(.caption)
-                .fontWeight(.medium)
-                .foregroundColor(agent.color)
-            Text(waitingText)
-                .font(.caption2)
-                .foregroundColor(.gray)
-        }
-    }
-
-    private var developerPreview: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "chevron.left.forwardslash.chevron.right")
-                .font(.system(size: 36))
-                .foregroundColor(.purple.opacity(0.7))
-            Text("developer")
-                .font(.caption)
-                .fontWeight(.medium)
-                .foregroundColor(.purple)
-            Text("waiting for code output...")
-                .font(.caption2)
-                .foregroundColor(.gray)
-        }
-    }
-
-    private var researchPreview: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 36))
-                .foregroundColor(.blue.opacity(0.7))
-            Text("research")
-                .font(.caption)
-                .fontWeight(.medium)
-                .foregroundColor(.blue)
-            Text("waiting for research results...")
-                .font(.caption2)
-                .foregroundColor(.gray)
-        }
-    }
-
-    private var computerUsePreview: some View {
-        Group {
-            if let frame = desktopFrame,
-               let imageData = Data(base64Encoded: frame),
-               let uiImage = UIImage(data: imageData) {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .cornerRadius(12)
-            } else {
-                VStack(spacing: 8) {
-                    Image(systemName: "desktopcomputer")
-                        .font(.system(size: 36))
-                        .foregroundColor(.orange.opacity(0.7))
-                    Text("computer use")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(.orange)
-                    Text("waiting for desktop stream...")
-                        .font(.caption2)
-                        .foregroundColor(.gray)
-                }
-            }
-        }
-    }
-
-    private var translatorPreview: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "globe")
-                .font(.system(size: 36))
-                .foregroundColor(.green.opacity(0.7))
-            Text("translator")
-                .font(.caption)
-                .fontWeight(.medium)
-                .foregroundColor(.green)
-            Text("waiting for translation...")
-                .font(.caption2)
-                .foregroundColor(.gray)
-        }
-    }
-
-    private var todoPreview: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "checklist")
-                .font(.system(size: 36))
-                .foregroundColor(.yellow.opacity(0.7))
-            Text("project manager")
-                .font(.caption)
-                .fontWeight(.medium)
-                .foregroundColor(.yellow)
-            Text("waiting for tasks...")
-                .font(.caption2)
-                .foregroundColor(.gray)
-        }
-    }
-
-    private var calendarPreview: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "calendar")
-                .font(.system(size: 36))
-                .foregroundColor(.red.opacity(0.7))
-            Text("calendar")
-                .font(.caption)
-                .fontWeight(.medium)
-                .foregroundColor(.red)
-            Text("waiting for schedule...")
-                .font(.caption2)
-                .foregroundColor(.gray)
-        }
-    }
-
-    private var lumaPreview: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "sparkle")
-                .font(.system(size: 36))
-                .foregroundColor(.cyan.opacity(0.7))
-            Text("luma")
-                .font(.caption)
-                .fontWeight(.medium)
-                .foregroundColor(.cyan)
-            Text("waiting for events...")
-                .font(.caption2)
-                .foregroundColor(.gray)
-        }
-    }
-
-    private var personaPreview: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "person.circle")
-                .font(.system(size: 36))
-                .foregroundColor(.pink.opacity(0.7))
-            Text("persona")
-                .font(.caption)
-                .fontWeight(.medium)
-                .foregroundColor(.pink)
-            Text("waiting for persona...")
-                .font(.caption2)
-                .foregroundColor(.gray)
-        }
-    }
-
-    // MARK: - transcript section
+    // MARK: - Transcript section
 
     private var transcriptSection: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -496,16 +390,14 @@ struct DashboardView: View {
                 .cornerRadius(12)
                 .onChange(of: transcript.count) { _ in
                     if let last = transcript.last {
-                        withAnimation {
-                            proxy.scrollTo(last.id, anchor: .bottom)
-                        }
+                        withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
                     }
                 }
             }
         }
     }
 
-    // MARK: - input section
+    // MARK: - Input section
 
     private var inputSection: some View {
         HStack {
@@ -529,7 +421,7 @@ struct DashboardView: View {
         .cornerRadius(22)
     }
 
-    // MARK: - actions
+    // MARK: - Actions
 
     private func sendMessage() {
         guard !userInput.isEmpty else { return }
@@ -537,15 +429,134 @@ struct DashboardView: View {
         transcript.append(entry)
         let agents = selectedAgents.map { $0.rawValue }
         webSocketManager.send(message: [
-            "type": "chat",
+            "type": "command",
+            "text": userInput,
             "agents": agents,
-            "text": userInput
         ])
         userInput = ""
     }
 }
 
-// MARK: - supporting views
+// MARK: - Agent Config Sheet
+
+extension AIAgent: Identifiable {
+    var id: String { rawValue }
+}
+
+struct AgentConfigSheet: View {
+    let agent: AIAgent
+    @Binding var config: AgentConfig
+    let onSave: (AgentConfig) -> Void
+
+    @Environment(\.dismiss) var dismiss
+
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Header
+                    VStack(spacing: 8) {
+                        Image(systemName: agent.icon)
+                            .font(.system(size: 36))
+                            .foregroundColor(agent.color)
+                        Text(agent.displayName)
+                            .font(.title3)
+                            .fontWeight(.bold)
+                    }
+                    .padding(.top)
+
+                    // LLM Model
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("LLM MODEL")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+
+                        ForEach(LLMModel.allCases, id: \.self) { model in
+                            Button {
+                                config.model = model
+                            } label: {
+                                HStack {
+                                    Circle()
+                                        .fill(model.color)
+                                        .frame(width: 10, height: 10)
+                                    Text(model.displayName)
+                                        .foregroundColor(.white)
+                                    Spacer()
+                                    if config.model == model {
+                                        Image(systemName: "checkmark")
+                                            .foregroundColor(agent.color)
+                                    }
+                                }
+                                .padding()
+                                .background(config.model == model ? agent.color.opacity(0.15) : Color(white: 0.1))
+                                .cornerRadius(10)
+                            }
+                        }
+                    }
+
+                    // CLI Tool
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("CLI TOOL")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+
+                        ForEach(CLITool.allCases, id: \.self) { cli in
+                            Button {
+                                config.cli = cli
+                                config.useCli = cli != .none
+                            } label: {
+                                HStack {
+                                    Text(cli.displayName)
+                                        .foregroundColor(.white)
+                                    Spacer()
+                                    if config.cli == cli {
+                                        Image(systemName: "checkmark")
+                                            .foregroundColor(agent.color)
+                                    }
+                                }
+                                .padding()
+                                .background(config.cli == cli ? agent.color.opacity(0.15) : Color(white: 0.1))
+                                .cornerRadius(10)
+                            }
+                        }
+                    }
+
+                    // Use CLI toggle
+                    Toggle(isOn: $config.useCli) {
+                        Text("Use CLI instead of API")
+                    }
+                    .padding()
+                    .background(Color(white: 0.1))
+                    .cornerRadius(10)
+
+                    // Save
+                    Button {
+                        onSave(config)
+                    } label: {
+                        Text("Save Configuration")
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(agent.color)
+                            .foregroundColor(.white)
+                            .cornerRadius(12)
+                    }
+                }
+                .padding()
+            }
+            .background(Color.black)
+            .preferredColorScheme(.dark)
+            .navigationTitle("Configure \(agent.displayName)")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Supporting views
 
 struct TranscriptBubble: View {
     let entry: TranscriptEntry
@@ -558,7 +569,6 @@ struct TranscriptBubble: View {
                     .foregroundColor(.purple)
                     .frame(width: 20)
             }
-
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text(entry.speaker)
@@ -572,9 +582,7 @@ struct TranscriptBubble: View {
                     .font(.callout)
                     .foregroundColor(.white)
             }
-
             Spacer()
-
             if !entry.isAI {
                 Image(systemName: "person.fill")
                     .font(.caption)
@@ -597,12 +605,10 @@ struct TranscriptBubbleCompact: View {
                 .font(.system(size: 10))
                 .foregroundColor(entry.isAI ? .purple : .blue)
                 .frame(width: 14)
-
             Text(entry.text)
                 .font(.caption2)
                 .foregroundColor(.white)
                 .lineLimit(3)
-
             Spacer(minLength: 0)
         }
         .padding(6)
@@ -611,24 +617,7 @@ struct TranscriptBubbleCompact: View {
     }
 }
 
-struct QuickActionButton: View {
-    let title: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.caption)
-                .foregroundColor(.white)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(Color(white: 0.2))
-                .cornerRadius(16)
-        }
-    }
-}
-
-// MARK: - notifications
+// MARK: - Notifications
 
 extension Notification.Name {
     static let frameReceived = Notification.Name("frameReceived")

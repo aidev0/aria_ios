@@ -14,6 +14,9 @@
 		8A5B6C7D8E9F0A1B2C3D4E5F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5A6B7C8D9E0F1A2B3C4D5E6F /* Assets.xcassets */; };
 		8A6B7C8D9E0F1A2B3C4D5E6F /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A7B8C9D0E1F2A3B4C5D6E7A /* DashboardView.swift */; };
 		8A7B8C9D0E1F2A3B4C5D6E7F /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A8B9C0D1E2F3A4B5C6D7E8A /* SettingsView.swift */; };
+		8A8B9C0D1E2F3A4B5C6D7E8C /* RegistrationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A8B9C0D1E2F3A4B5C6D7E8B /* RegistrationView.swift */; };
+		MWDAT0001 /* MWDATCore in Frameworks */ = {isa = PBXBuildFile; productRef = MWDAT0002 /* MWDATCore */; };
+		MWDAT0003 /* MWDATCamera in Frameworks */ = {isa = PBXBuildFile; productRef = MWDAT0004 /* MWDATCamera */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -25,6 +28,7 @@
 		5A6B7C8D9E0F1A2B3C4D5E6F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		6A7B8C9D0E1F2A3B4C5D6E7A /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		7A8B9C0D1E2F3A4B5C6D7E8A /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		8A8B9C0D1E2F3A4B5C6D7E8B /* RegistrationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegistrationView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -32,6 +36,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				MWDAT0001 /* MWDATCore in Frameworks */,
+				MWDAT0003 /* MWDATCamera in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -61,6 +67,7 @@
 				2A3B4C5D6E7F8A9B0C1D2E3F /* ContentView.swift */,
 				6A7B8C9D0E1F2A3B4C5D6E7A /* DashboardView.swift */,
 				7A8B9C0D1E2F3A4B5C6D7E8A /* SettingsView.swift */,
+				8A8B9C0D1E2F3A4B5C6D7E8B /* RegistrationView.swift */,
 				3A4B5C6D7E8F9A0B1C2D3E4F /* WebSocketManager.swift */,
 				4A5B6C7D8E9F0A1B2C3D4E5F /* GlassesManager.swift */,
 				5A6B7C8D9E0F1A2B3C4D5E6F /* Assets.xcassets */,
@@ -84,6 +91,10 @@
 			dependencies = (
 			);
 			name = AriaGlasses;
+			packageProductDependencies = (
+				MWDAT0002 /* MWDATCore */,
+				MWDAT0004 /* MWDATCamera */,
+			);
 			productName = AriaGlasses;
 			productReference = 0A1B2C3D4E5F6A7B8C9D0E1F /* AriaGlasses.app */;
 			productType = "com.apple.product-type.application";
@@ -96,7 +107,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1500;
-				LastUpgradeCheck = 1500;
+				LastUpgradeCheck = 2620;
 				TargetAttributes = {
 					AA1B2C3D4E5F6A7B8C9D0E1F = {
 						CreatedOnToolsVersion = 15.0;
@@ -112,6 +123,9 @@
 				Base,
 			);
 			mainGroup = 7A8B9C0D1E2F3A4B5C6D7E8F;
+			packageReferences = (
+				MWDAT0005 /* XCRemoteSwiftPackageReference "meta-wearables-dat-ios" */,
+			);
 			productRefGroup = 8A9B0C1D2E3F4A5B6C7D8E9F /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -143,6 +157,7 @@
 				8A4B5C6D7E8F9A0B1C2D3E4F /* GlassesManager.swift in Sources */,
 				8A6B7C8D9E0F1A2B3C4D5E6F /* DashboardView.swift in Sources */,
 				8A7B8C9D0E1F2A3B4C5D6E7F /* SettingsView.swift in Sources */,
+				8A8B9C0D1E2F3A4B5C6D7E8C /* RegistrationView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -201,12 +216,13 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -258,11 +274,12 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
 			};
@@ -275,12 +292,16 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 95V6RUNDYY;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "aria";
-				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "connect to meta glasses";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "connect to local server";
+				INFOPLIST_FILE = AriaGlasses/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = aria;
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Connect to Meta AI glasses for video and audio streaming";
+				INFOPLIST_KEY_NSBluetoothPeripheralUsageDescription = "Connect to Meta AI glasses";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Access camera through Meta glasses";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Connect to local AI server";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Access microphone through Meta glasses";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -305,12 +326,16 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 95V6RUNDYY;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "aria";
-				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "connect to meta glasses";
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "connect to local server";
+				INFOPLIST_FILE = AriaGlasses/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = aria;
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Connect to Meta AI glasses for video and audio streaming";
+				INFOPLIST_KEY_NSBluetoothPeripheralUsageDescription = "Connect to Meta AI glasses";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Access camera through Meta glasses";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Connect to local AI server";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Access microphone through Meta glasses";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -350,6 +375,30 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		MWDAT0005 /* XCRemoteSwiftPackageReference "meta-wearables-dat-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/facebook/meta-wearables-dat-ios";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.3.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		MWDAT0002 /* MWDATCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = MWDAT0005 /* XCRemoteSwiftPackageReference "meta-wearables-dat-ios" */;
+			productName = MWDATCore;
+		};
+		MWDAT0004 /* MWDATCamera */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = MWDAT0005 /* XCRemoteSwiftPackageReference "meta-wearables-dat-ios" */;
+			productName = MWDATCamera;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = EE1B2C3D4E5F6A7B8C9D0E1F /* Project object */;
 }
