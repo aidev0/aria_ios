@@ -1,15 +1,34 @@
 import SwiftUI
 
 struct ContentView: View {
+    @EnvironmentObject var authManager: AuthManager
     @StateObject private var webSocketManager = WebSocketManager()
     @StateObject private var glassesManager = GlassesManager()
-    @State private var selectedAgents: Set<AIAgent> = []
     @State private var agentConfigs: [AIAgent: AgentConfig] = [:]
+    @State private var configuringAgent: AIAgent? = nil
 
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 20) {
+                    // User info bar
+                    if let user = authManager.user {
+                        HStack {
+                            Text(user.firstName ?? user.email)
+                                .font(.system(size: 12))
+                                .foregroundColor(.gray)
+                            Spacer()
+                            Button {
+                                authManager.signOut()
+                            } label: {
+                                Text("sign out")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.red.opacity(0.7))
+                            }
+                        }
+                        .padding(.horizontal, 4)
+                    }
+
                     dashboardButton
                     connectionsSection
                     controlsSection
@@ -25,11 +44,65 @@ struct ContentView: View {
             .toolbarBackground(.visible, for: .navigationBar)
             .navigationBarTitleDisplayMode(.inline)
             .onAppear {
+                // Pass auth token to WebSocket manager
+                webSocketManager.accessToken = authManager.accessToken
+
                 glassesManager.setFrameCallback { base64Data in
                     webSocketManager.sendFrame(base64Data: base64Data)
                 }
-                glassesManager.setAudioCallback { base64Data in
+                glassesManager.setAudioCallback { [weak glassesManager] base64Data in
+                    // Only send audio to backend when using Whisper, not Apple Speech
+                    guard glassesManager?.sttProvider != "apple" else { return }
                     webSocketManager.sendAudio(base64Data: base64Data)
+                }
+                // Apple Speech on-device transcription callback
+                glassesManager.setTranscriptionCallback { text, isFinal in
+                    let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                    // Ignore empty or very short results (likely noise)
+                    guard trimmed.count > 3 else { return }
+                    // Update local transcript (partial updates replace last entry)
+                    NotificationCenter.default.post(
+                        name: .transcriptReceived,
+                        object: nil,
+                        userInfo: ["text": text, "speaker": "you", "isAI": false, "isFinal": isFinal]
+                    )
+                    // Only send final results to server
+                    if isFinal {
+                        webSocketManager.send(message: [
+                            "type": "transcription",
+                            "text": text,
+                            "source": "apple_speech",
+                        ])
+                    }
+                }
+                // Load saved agent configs from MongoDB
+                webSocketManager.loadAgentConfigs { configs in
+                    Task { @MainActor in
+                        for (agentType, configData) in configs {
+                            guard let agent = AIAgent(rawValue: agentType) else { continue }
+                            var config = agent.defaultConfig
+                            if let model = configData["model"] as? String,
+                               let llm = LLMModel(rawValue: model) {
+                                config.model = llm
+                            }
+                            if let cli = configData["cli"] as? String,
+                               let tool = CLITool(rawValue: cli) {
+                                config.cli = tool
+                            }
+                            if let useCli = configData["use_cli"] as? Bool {
+                                config.useCli = useCli
+                            }
+                            if let tts = configData["tts_provider"] as? String,
+                               let provider = TTSProvider(rawValue: tts) {
+                                config.ttsProvider = provider
+                            }
+                            if let stt = configData["stt_provider"] as? String,
+                               let provider = STTProvider(rawValue: stt) {
+                                config.sttProvider = provider
+                            }
+                            agentConfigs[agent] = config
+                        }
+                    }
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: .aiSpeaking)) { notification in
@@ -44,56 +117,55 @@ struct ContentView: View {
         }
         .navigationViewStyle(.stack)
         .preferredColorScheme(.dark)
+        .sheet(item: $configuringAgent) { agent in
+            AgentConfigSheet(
+                agent: agent,
+                config: Binding(
+                    get: { agentConfigs[agent] ?? agent.defaultConfig },
+                    set: { agentConfigs[agent] = $0 }
+                ),
+                onSave: { config in
+                    agentConfigs[agent] = config
+                    webSocketManager.saveAgentConfig(
+                        agentType: agent.rawValue,
+                        model: config.model.rawValue,
+                        cli: config.cli.rawValue,
+                        useCli: config.useCli,
+                        ttsProvider: config.ttsProvider.rawValue,
+                        sttProvider: config.sttProvider.rawValue
+                    )
+                    configuringAgent = nil
+                }
+            )
+        }
     }
 
     private var dashboardButton: some View {
         NavigationLink {
-            DashboardView(glassesManager: glassesManager, webSocketManager: webSocketManager, selectedAgents: $selectedAgents, agentConfigs: $agentConfigs)
+            DashboardView(glassesManager: glassesManager, webSocketManager: webSocketManager, agentConfigs: $agentConfigs)
         } label: {
-            VStack(spacing: 12) {
-                ZStack(alignment: .topTrailing) {
-                    HStack(spacing: 20) {
-                        Image("aria_wf_bb")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(height: 50)
-                        Image("aria_wf_bb")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(height: 50)
-                    }
-                    .shadow(color: glassesManager.videoStatus == .streaming ? .red.opacity(0.8) : .white.opacity(0.3), radius: 20)
-
-                    // Recording indicator
-                    if glassesManager.videoStatus == .streaming {
-                        Circle()
-                            .fill(Color.red)
-                            .frame(width: 10, height: 10)
-                            .shadow(color: .red, radius: 4)
-                            .offset(x: 5, y: -5)
-                    }
+            VStack(spacing: 16) {
+                ZStack {
+                    Image("aria_logo_body")
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
+                        .foregroundColor(.white)
+                    Image("aria_logo_dot")
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
+                        .foregroundColor(glassesManager.videoStatus == .streaming ? .red : .white)
+                        .shadow(color: glassesManager.videoStatus == .streaming ? .red : .clear, radius: 6)
                 }
-                Text("tap to enter aria")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white.opacity(0.7))
+                .frame(height: 70)
+                Text("tap to enter aria experience")
+                    .font(.system(size: 11))
+                    .foregroundColor(.gray)
                     .tracking(2)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 30)
-            .background(Color.black)
-            .cornerRadius(16)
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(
-                        LinearGradient(
-                            colors: [.white.opacity(0.3), .white.opacity(0.1)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        ),
-                        lineWidth: 1
-                    )
-            )
-            .shadow(color: .white.opacity(0.1), radius: 10)
+            .padding(.vertical, 20)
         }
     }
 
@@ -124,7 +196,7 @@ struct ContentView: View {
                 Image(systemName: "eyeglasses")
                     .font(.title2)
                     .foregroundColor(isConnected ? .green : .white)
-                Text(glassesManager.connectionStatus == .disconnected ? "connect glasses" : "disconnect")
+                Text(glassesManager.connectionStatus == .disconnected ? "connect to meta glasses" : "disconnect")
                     .font(.caption)
                     .multilineTextAlignment(.center)
             }
@@ -153,7 +225,7 @@ struct ContentView: View {
                 Image(systemName: "cpu.fill")
                     .font(.title2)
                     .foregroundColor(isConnected ? .cyan : .white)
-                Text(webSocketManager.status == .disconnected ? "connect to ai" : "disconnect")
+                Text(webSocketManager.status == .disconnected ? "connect to aria ai" : "disconnect")
                     .font(.caption)
                     .multilineTextAlignment(.center)
             }
@@ -200,7 +272,7 @@ struct ContentView: View {
                     Image(systemName: "video.fill")
                         .font(.title2)
                         .foregroundColor(isActive ? .white : .gray)
-                    Text(isActive ? "rec" : "see")
+                    Text(isActive ? "rec" : "camera")
                         .font(.caption)
                         .foregroundColor(isActive ? .white : .gray)
                 }
@@ -223,6 +295,9 @@ struct ContentView: View {
         let isActive = glassesManager.audioStatus == .streaming
         return Button {
             if glassesManager.audioStatus == .stopped {
+                // Set STT provider from config
+                let sttConfig = agentConfigs[.speechToText] ?? AIAgent.speechToText.defaultConfig
+                glassesManager.sttProvider = sttConfig.sttProvider.rawValue
                 glassesManager.startAudio()
                 webSocketManager.sendCommand(action: "mic_start")
             } else {
@@ -235,7 +310,7 @@ struct ContentView: View {
                     Image(systemName: "mic.fill")
                         .font(.title2)
                         .foregroundColor(isActive ? .white : .gray)
-                    Text(isActive ? "on" : "listen")
+                    Text(isActive ? "on" : "mic")
                         .font(.caption)
                         .foregroundColor(isActive ? .white : .gray)
                 }
@@ -270,7 +345,7 @@ struct ContentView: View {
                     Image(systemName: "speaker.wave.2.fill")
                         .font(.title2)
                         .foregroundColor(isActive ? .white : .gray)
-                    Text(isActive ? "on" : "talk")
+                    Text(isActive ? "on" : "speaker")
                         .font(.caption)
                         .foregroundColor(isActive ? .white : .gray)
                 }
@@ -310,37 +385,54 @@ struct ContentView: View {
     }
 
     private func agentButton(for agent: AIAgent) -> some View {
-        let isSelected = selectedAgents.contains(agent)
+        let config = agentConfigs[agent] ?? agent.defaultConfig
         return Button {
-            if isSelected {
-                selectedAgents.remove(agent)
-                webSocketManager.sendCommand(action: "agent_deselect_\(agent.rawValue)")
-            } else {
-                selectedAgents.insert(agent)
-                webSocketManager.sendCommand(action: "agent_select_\(agent.rawValue)")
-            }
+            configuringAgent = agent
         } label: {
-            VStack(spacing: 4) {
-                Image(systemName: agent.icon)
-                    .font(.system(size: 18))
-                Text(agent.displayName)
-                    .font(.system(size: 9))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+            VStack(spacing: 3) {
+            Image(systemName: agent.icon)
+                .font(.system(size: 16))
+                .foregroundColor(agent.color)
+            Text(agent.displayName)
+                .font(.system(size: 9, weight: .medium))
+                .foregroundColor(.white)
+                .lineLimit(1)
+            if agent.isDevAgent {
+                if config.useCli {
+                    Text(config.cli.displayName)
+                        .font(.system(size: 7))
+                        .foregroundColor(.gray)
+                } else {
+                    Text(config.model.displayName)
+                        .font(.system(size: 7))
+                        .foregroundColor(config.model.color)
+                }
+            } else if agent == .orchestrator {
+                Text(config.model.displayName)
+                    .font(.system(size: 7))
+                    .foregroundColor(config.model.color)
+            } else if agent == .textToSpeech {
+                Text(config.ttsProvider.displayName)
+                    .font(.system(size: 7))
+                    .foregroundColor(config.ttsProvider.color)
+            } else if agent == .speechToText {
+                Text(config.sttProvider.displayName)
+                    .font(.system(size: 7))
+                    .foregroundColor(config.sttProvider.color)
             }
-            .foregroundColor(isSelected ? .white : .gray)
+        }
             .frame(maxWidth: .infinity)
-            .frame(height: 50)
-            .background(isSelected ? agent.color.opacity(0.3) : Color(white: 0.15))
+            .frame(height: 65)
+            .background(agent.color.opacity(0.15))
             .cornerRadius(10)
             .overlay(
                 RoundedRectangle(cornerRadius: 10)
-                    .stroke(isSelected ? agent.color : Color.clear, lineWidth: 2)
+                    .stroke(agent.color.opacity(0.3), lineWidth: 1)
             )
         }
     }
-
 }
+
 
 
 #Preview {

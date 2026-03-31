@@ -15,6 +15,8 @@
 		8A6B7C8D9E0F1A2B3C4D5E6F /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A7B8C9D0E1F2A3B4C5D6E7A /* DashboardView.swift */; };
 		8A7B8C9D0E1F2A3B4C5D6E7F /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A8B9C0D1E2F3A4B5C6D7E8A /* SettingsView.swift */; };
 		8A8B9C0D1E2F3A4B5C6D7E8C /* RegistrationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A8B9C0D1E2F3A4B5C6D7E8B /* RegistrationView.swift */; };
+		AA0001001000100010001000 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0001001000100010001001 /* AuthManager.swift */; };
+		AA0001001000100010001002 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0001001000100010001003 /* LoginView.swift */; };
 		MWDAT0001 /* MWDATCore in Frameworks */ = {isa = PBXBuildFile; productRef = MWDAT0002 /* MWDATCore */; };
 		MWDAT0003 /* MWDATCamera in Frameworks */ = {isa = PBXBuildFile; productRef = MWDAT0004 /* MWDATCamera */; };
 /* End PBXBuildFile section */
@@ -29,6 +31,8 @@
 		6A7B8C9D0E1F2A3B4C5D6E7A /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		7A8B9C0D1E2F3A4B5C6D7E8A /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		8A8B9C0D1E2F3A4B5C6D7E8B /* RegistrationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegistrationView.swift; sourceTree = "<group>"; };
+		AA0001001000100010001001 /* AuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
+		AA0001001000100010001003 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -64,6 +68,8 @@
 			isa = PBXGroup;
 			children = (
 				1A2B3C4D5E6F7A8B9C0D1E2F /* AriaGlassesApp.swift */,
+				AA0001001000100010001001 /* AuthManager.swift */,
+				AA0001001000100010001003 /* LoginView.swift */,
 				2A3B4C5D6E7F8A9B0C1D2E3F /* ContentView.swift */,
 				6A7B8C9D0E1F2A3B4C5D6E7A /* DashboardView.swift */,
 				7A8B9C0D1E2F3A4B5C6D7E8A /* SettingsView.swift */,
@@ -158,6 +164,8 @@
 				8A6B7C8D9E0F1A2B3C4D5E6F /* DashboardView.swift in Sources */,
 				8A7B8C9D0E1F2A3B4C5D6E7F /* SettingsView.swift in Sources */,
 				8A8B9C0D1E2F3A4B5C6D7E8C /* RegistrationView.swift in Sources */,
+				AA0001001000100010001000 /* AuthManager.swift in Sources */,
+				AA0001001000100010001002 /* LoginView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

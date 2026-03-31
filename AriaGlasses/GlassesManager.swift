@@ -1,5 +1,7 @@
 import Foundation
 import UIKit
+import AVFoundation
+import Speech
 import MWDATCore
 import MWDATCamera
 
@@ -43,6 +45,16 @@ class GlassesManager: ObservableObject {
 
     private var frameCallback: ((String) -> Void)?
     private var audioCallback: ((String) -> Void)?
+    /// Callback: (text, isFinal)
+    private var transcriptionCallback: ((String, Bool) -> Void)?
+
+    /// Set to .apple for on-device speech recognition, .whisper for backend
+    var sttProvider: String = "whisper"
+
+    // Apple Speech
+    private var speechRecognizer: SFSpeechRecognizer?
+    private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
+    private var recognitionTask: SFSpeechRecognitionTask?
 
     private let normalMusicVolume: Float = 1.0
     private let duckedMusicVolume: Float = 0.3
@@ -116,6 +128,10 @@ class GlassesManager: ObservableObject {
 
     func setAudioCallback(_ callback: @escaping (String) -> Void) {
         self.audioCallback = callback
+    }
+
+    func setTranscriptionCallback(_ callback: @escaping (String, Bool) -> Void) {
+        self.transcriptionCallback = callback
     }
 
     func connectToGlasses() {
@@ -264,13 +280,166 @@ class GlassesManager: ObservableObject {
         currentFrame = nil
     }
 
+    private let audioEngine = AVAudioEngine()
+
     func startAudio() {
         guard audioStatus == .stopped else { return }
-        audioStatus = .streaming
+
+        let audioSession = AVAudioSession.sharedInstance()
+        do {
+            try audioSession.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth, .allowBluetoothA2DP])
+            try audioSession.setActive(true)
+        } catch {
+            print("[GlassesManager] Audio session error: \(error)")
+            return
+        }
+
+        // Log available audio inputs
+        print("[GlassesManager] Available audio inputs:")
+        for input in audioSession.availableInputs ?? [] {
+            print("  - \(input.portName) (\(input.portType.rawValue))")
+        }
+        if let currentInput = audioSession.currentRoute.inputs.first {
+            print("[GlassesManager] Current input: \(currentInput.portName) (\(currentInput.portType.rawValue))")
+        }
+
+        if sttProvider == "apple" {
+            startAppleSpeech()
+        } else {
+            startWhisperStream()
+        }
     }
 
     func stopAudio() {
+        if sttProvider == "apple" {
+            stopAppleSpeech()
+        } else {
+            stopWhisperStream()
+        }
+    }
+
+    // MARK: - Whisper (send audio to backend)
+
+    private func startWhisperStream() {
+        let inputNode = audioEngine.inputNode
+        let format = inputNode.outputFormat(forBus: 0)
+        print("[GlassesManager] Audio format: \(format)")
+
+        inputNode.installTap(onBus: 0, bufferSize: 4096, format: format) { [weak self] buffer, _ in
+            guard let self = self else { return }
+            let pcmData = self.bufferToData(buffer: buffer)
+            let base64String = pcmData.base64EncodedString()
+            Task { @MainActor in
+                self.audioCallback?(base64String)
+            }
+        }
+
+        do {
+            try audioEngine.start()
+            audioStatus = .streaming
+            print("[GlassesManager] Whisper audio streaming started")
+        } catch {
+            print("[GlassesManager] Audio engine start error: \(error)")
+        }
+    }
+
+    private func stopWhisperStream() {
+        audioEngine.inputNode.removeTap(onBus: 0)
+        audioEngine.stop()
         audioStatus = .stopped
+        print("[GlassesManager] Whisper audio streaming stopped")
+    }
+
+    // MARK: - Apple Speech (on-device recognition)
+
+    private func startAppleSpeech() {
+        SFSpeechRecognizer.requestAuthorization { [weak self] status in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                guard status == .authorized else {
+                    print("[GlassesManager] Speech recognition not authorized: \(status.rawValue)")
+                    return
+                }
+                self.beginAppleRecognition()
+            }
+        }
+    }
+
+    private func beginAppleRecognition() {
+        speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
+        guard let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else {
+            print("[GlassesManager] Speech recognizer not available")
+            return
+        }
+
+        recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
+        guard let recognitionRequest = recognitionRequest else { return }
+
+        recognitionRequest.shouldReportPartialResults = true
+        recognitionRequest.taskHint = .dictation
+        recognitionRequest.addsPunctuation = true
+        if speechRecognizer.supportsOnDeviceRecognition {
+            recognitionRequest.requiresOnDeviceRecognition = true
+            print("[GlassesManager] Using on-device Apple Speech recognition")
+        } else {
+            print("[GlassesManager] On-device not available, using server-based Apple Speech")
+        }
+
+        recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                if let result = result {
+                    let text = result.bestTranscription.formattedString
+                    let isFinal = result.isFinal
+                    self.transcriptionCallback?(text, isFinal)
+                }
+                if let error = error {
+                    print("[GlassesManager] Apple Speech error: \(error.localizedDescription)")
+                }
+            }
+        }
+
+        let inputNode = audioEngine.inputNode
+        let recordingFormat = inputNode.outputFormat(forBus: 0)
+
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
+            self?.recognitionRequest?.append(buffer)
+        }
+
+        do {
+            try audioEngine.start()
+            audioStatus = .streaming
+            print("[GlassesManager] Apple Speech recognition started")
+        } catch {
+            print("[GlassesManager] Audio engine start error: \(error)")
+        }
+    }
+
+    private func stopAppleSpeech() {
+        audioEngine.inputNode.removeTap(onBus: 0)
+        audioEngine.stop()
+        recognitionRequest?.endAudio()
+        recognitionTask?.cancel()
+        recognitionRequest = nil
+        recognitionTask = nil
+        audioStatus = .stopped
+        print("[GlassesManager] Apple Speech recognition stopped")
+    }
+
+    // MARK: - Audio helpers
+
+    private func bufferToData(buffer: AVAudioPCMBuffer) -> Data {
+        let channelData = buffer.floatChannelData![0]
+        let frameCount = Int(buffer.frameLength)
+        var int16Data = Data(count: frameCount * 2)
+        int16Data.withUnsafeMutableBytes { ptr in
+            let int16Ptr = ptr.bindMemory(to: Int16.self)
+            for i in 0..<frameCount {
+                let sample = max(-1.0, min(1.0, channelData[i]))
+                int16Ptr[i] = Int16(sample * 32767)
+            }
+        }
+        return int16Data
     }
 
     func startSpeaker() {
